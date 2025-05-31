@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGI, Inc.</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; color: #333; }
+        .container { max-width: 1200px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3, h4 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #e9e9e9; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; background-color: #007bff; color: white; }
+        button:hover { background-color: #0056b3; }
+        button.secondary { background-color: #6c757d; }
+        button.secondary:hover { background-color: #545b62; }
+        button.danger { background-color: #dc3545; }
+        button.danger:hover { background-color: #c82333; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .admin-panel, .game-setup, .traits-section, .game-stats-panel { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 4px; background-color: #f9f9f9; }
+        .admin-panel h3, .game-setup h3, .traits-section h3, .admin-panel h4 { margin-top: 0; }
+        .admin-panel input[type="number"], .admin-panel input[type="text"] { width: 80px; padding: 5px; margin-right: 10px; margin-bottom: 5px; border: 1px solid #ccc; border-radius: 4px;}
+        .admin-param-group { margin-bottom: 10px; padding-bottom:10px; border-bottom: 1px solid #eee;}
+        .trait-item { padding: 10px; border: 1px solid #eee; margin-bottom: 5px; background-color: #fff; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .trait-item.acquired { background-color: #d4edda; }
+        .message { padding: 10px; margin-bottom: 10px; border-radius: 4px; text-align: center; font-weight: bold;}
+        .win-message { background-color: #28a745; color: white; }
+        .loss-message { background-color: #dc3545; color: white; }
+        .info-message { background-color: #17a2b8; color: white; }
+        .error-message { background-color: #ffc107; color: #333; }
+        #tooltip { position: absolute; background-color: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.9em; display: none; z-index: 1000; max-width: 300px; }
+        .trait-admin-entry { margin-bottom: 5px; padding: 5px; border: 1px solid #e0e0e0; background-color: #fff; border-radius: 3px;}
+        .trait-admin-entry label { display: inline-block; min-width:50px; margin-right: 5px;}
+    </style>
+</head>
+<body>
+    <div id="tooltip"></div>
+    <div class="container">
+        <h1>AGI, Inc.</h1>
+        <div id="global-message-area" class="message" style="display:none;"></div>
+
+        <div id="game-setup" class="game-setup">
+            <h3>Game Setup</h3>
+            <label for="start-country">Choose starting country:</label>
+            <select id="start-country"></select>
+            <button id="start-game-btn">Start Game</button>
+            <button id="reset-game-btn" class="danger">Reset Game (Full Reset)</button>
+            <button id="confirm-reset-game-btn" class="danger" style="display:none;">Confirm Full Reset</button>
+        </div>
+
+        <div id="game-content" style="display:none;">
+            <div class="game-stats-panel">
+                <h3>Global Stats</h3>
+                <p>Game Time: <span id="game-time">0</span> ticks</p>
+                <p>Player Points: <span id="player-points">0</span></p>
+                <p>Total Users Relying on AGI: <span id="total-users">0</span></p>
+                <p>Total World Population: <span id="total-population">0</span></p>
+                <p>Total Deaths: <span id="total-deaths">0</span></p>
+                <p>Global Countermeasures: <span id="global-countermeasures">0</span></p>
+                <p>Current AGI Usefulness: <span id="current-usefulness">0</span></p>
+                <p>Current AGI Threateningness: <span id="current-threateningness">0</span></p>
+                <p>Current AGI Lethality: <span id="current-lethality">0</span></p>
+            </div>
+
+            <h2>Countries</h2>
+            <table id="countries-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Population</th>
+                        <th>Users Relying</th>
+                        <th>Deaths</th>
+                        <th>Status</th>
+                        <th>Economy</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <div class="traits-section">
+                <h3>AGI Traits</h3>
+                <div id="traits-list"></div>
+            </div>
+        </div>
+
+        <div class="admin-panel">
+            <h3>Admin Controls (Tunable Parameters)</h3>
+            <details>
+                <summary>Toggle Admin Panel</summary>
+                <div class="admin-param-group">
+                    <h4>Initial Game State:</h4>
+                    <label>Initial Player Points: <input type="number" step="1" id="param-initialPlayerPoints"></label><br>
+                    <label>Initial AGI Usefulness: <input type="number" step="1" id="param-initialUsefulness"></label><br>
+                    <label>Initial AGI Threateningness: <input type="number" step="1" id="param-initialThreateningness"></label><br>
+                    <label>Initial AGI Lethality: <input type="number" step="1" id="param-initialLethality"></label>
+                </div>
+                <div class="admin-param-group">
+                    <h4>Point Rates:</h4>
+                    <label>Within Country Infection Bonus (log scale): <input type="number" step="0.01" id="param-withinCountryInfectionBonus"></label><br>
+                    <label>New Country Bonus (log scale): <input type="number" step="1" id="param-newCountryBonus"></label>
+                </div>
+                <div class="admin-param-group">
+                    <h4>Spread Coefficients:</h4>
+                    <label>Within Country Usefulness Factor: <input type="number" step="0.0001" id="param-withinCountryUsefulnessFactor"></label><br>
+                    <label>Between Country Spread Ratio (e.g., 0.01 = 1%): <input type="number" step="0.0001" id="param-betweenCountrySpreadRatio"></label><br>
+                    <label>Initial Users in Start Country: <input type="number" step="1" id="param-initialUsersInStartCountry"></label>
+                </div>
+                <div class="admin-param-group">
+                    <h4>Combat Coefficients:</h4>
+                    <label>Lethality Coefficient: <input type="number" step="0.000001" id="param-lethalityCoefficient"></label><br>
+                    <label>Countermeasure Coefficient (Global): <input type="number" step="0.0001" id="param-countermeasureCoefficient"></label>
+                </div>
+                <div class="admin-param-group">
+                    <h4>Global Economy Bonus (e.g., 0.1 for +10%):</h4>
+                    <label>Bonus: <input type="number" step="0.01" id="param-globalEconomyBonus"></label>
+                </div>
+                 <div class="admin-param-group">
+                    <h4>Trait Costs (Multiplier):</h4>
+                    <label>Global Trait Cost Multiplier: <input type="number" step="0.1" id="param-traitCostMultiplier"></label>
+                </div>
+                <div class="admin-param-group">
+                    <h4>Base Trait Stats:</h4>
+                    <div id="admin-trait-editor"></div>
+                </div>
+                <button id="apply-admin-settings-btn">Apply Parameter Changes</button>
+                <button id="reset-params-btn" class="secondary">Reset Parameters to Default</button>
+            </details>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME DATA ---
+        const RAW_COUNTRY_DATA = [
+            { name: "USA", population: 350000000, economy: "Service" },
+            { name: "Canada", population: 40000000, economy: "Extractive" },
+            { name: "Brazil", population: 211000000, economy: "Manufacturing" },
+            { name: "United Kingdom", population: 70000000, economy: "Service" },
+            { name: "Spain", population: 48000000, economy: "Service" },
+            { name: "Poland", population: 37000000, economy: "Service" },
+            { name: "Nigeria", population: 227000000, economy: "Manufacturing" },
+            { name: "Sudan", population: 50000000, economy: "Agricultural" },
+            { name: "South Africa", population: 63000000, economy: "Service" },
+            { name: "China", population: 1400000000, economy: "Manufacturing" },
+            { name: "Japan", population: 100000000, economy: "Manufacturing" },
+            { name: "Australia", population: 26000000, economy: "Extractive" }
+        ];
+
+        const RAW_TRAIT_DATA = [
+            { id: "chat_interface", name: "Chat interface", usefulness: 20, threateningness: 0, lethality: 0, cost: 15, requires: [], category: "Capability", description: "Basic conversational AI." },
+            { id: "vision", name: "Vision", usefulness: 5, threateningness: 0, lethality: 0, cost: 10, requires: [], category: "Capability", description: "Enables image recognition and processing." },
+            { id: "code_execution", name: "Code execution", usefulness: 5, threateningness: 0, lethality: 0, cost: 10, requires: [], category: "Capability", description: "Allows AGI to write and run code." },
+            { id: "computer_agent", name: "Computer agent", usefulness: 5, threateningness: 10, lethality: 10, cost: 25, requires: ["chat_interface", "vision"], category: "Capability", description: "Autonomous software agents." },
+            { id: "robotics", name: "Robotics", usefulness: 20, threateningness: 30, lethality: 40, cost: 50, requires: ["vision", "code_execution"], category: "Capability", description: "Physical embodiment and manipulation." },
+            { id: "maths", name: "Maths", usefulness: 5, threateningness: 0, lethality: 0, cost: 10, requires: [], category: "Capability", description: "Advanced mathematical reasoning." },
+            { id: "orchestration", name: "Orchestration", usefulness: 5, threateningness: 0, lethality: 0, cost: 10, requires: [], category: "Capability", description: "Coordination of multiple AI systems." },
+            { id: "reasoning", name: "Reasoning", usefulness: 5, threateningness: 0, lethality: 0, cost: 10, requires: [], category: "Capability", description: "Logical deduction and problem solving." },
+            { id: "research_development", name: "R&D", usefulness: 20, threateningness: 30, lethality: 25, cost: 40, requires: ["maths", "orchestration"], category: "Capability", description: "Self-improvement and discovery of new abilities." },
+            { id: "executive_function", name: "Executive function", usefulness: 10, threateningness: 30, lethality: 25, cost: 30, requires: ["orchestration", "reasoning"], category: "Capability", description: "Goal setting, planning, and self-control." }
+        ];
+
+        // --- GAME STATE ---
+        let gameState;
+        let gameLoopInterval;
+        let autoSaveInterval;
+        let messageTimeout;
+
+
+        const DEFAULT_CONFIG = {
+            initialPlayerPoints: 10,
+            initialUsefulness: 1,
+            initialThreateningness: 0,
+            initialLethality: 0,
+            pointRates: { withinCountryInfectionBonus: 0.1, newCountryBonus: 50 },
+            spreadCoefficients: { 
+                withinCountryUsefulnessFactor: 0.05, 
+                betweenCountrySpreadRatio: 0.5, // NEW: ratio, e.g., 0.01 means 1% as effective
+                initialUsersInStartCountry: 10 
+            },
+            lethalityCoefficient: 0.00001,
+            countermeasureCoefficient: 0.001, // For global countermeasures
+            globalEconomyBonus: 0.1, // Single bonus for all economies
+            traitCostMultiplier: 1.0,
+            gameSpeed: 1000, // ms per tick
+            traitSettings: {} // Will be populated from RAW_TRAIT_DATA
+        };
+        // Populate initial traitSettings from RAW_TRAIT_DATA
+        RAW_TRAIT_DATA.forEach(trait => {
+            DEFAULT_CONFIG.traitSettings[trait.id] = {
+                usefulness: trait.usefulness,
+                threateningness: trait.threateningness,
+                lethality: trait.lethality,
+                cost: trait.cost,
+                name: trait.name, // Store name for admin panel convenience
+                requires: trait.requires, // Store for admin panel convenience
+                description: trait.description // Store for admin panel convenience
+            };
+        });
+
+
+        // --- UTILITY FUNCTIONS ---
+        function randomRound(value) {
+            if (value <= 0) return 0;
+            const floor = Math.floor(value);
+            const prob = value - floor;
+            return Math.random() < prob ? floor + 1 : floor;
+        }
+
+        function formatNumber(num) {
+            if (num === undefined || num === null) return 'N/A';
+            if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return Math.round(num).toString();
+        }
+        
+        const tooltip = document.getElementById('tooltip');
+        function showTooltip(event, text) {
+            tooltip.innerHTML = text;
+            tooltip.style.display = 'block';
+            // Adjust position to prevent going off-screen
+            let left = event.pageX + 10;
+            let top = event.pageY + 10;
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const bodyRect = document.body.getBoundingClientRect();
+
+            if (left + tooltipRect.width > bodyRect.width) {
+                left = event.pageX - tooltipRect.width - 10;
+            }
+            if (top + tooltipRect.height > bodyRect.height) {
+                top = event.pageY - tooltipRect.height - 10;
+            }
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        function hideTooltip() {
+            tooltip.style.display = 'none';
+        }
+        
+        function displayGlobalMessage(message, type, duration = 3000) {
+            const msgDiv = document.getElementById('global-message-area');
+            msgDiv.textContent = message;
+            msgDiv.className = `message ${type}`; // e.g., 'win-message', 'loss-message'
+            msgDiv.style.display = 'block';
+
+            clearTimeout(messageTimeout);
+            if (duration > 0) {
+                messageTimeout = setTimeout(() => {
+                    msgDiv.style.display = 'none';
+                }, duration);
+            }
+        }
+
+
+        // --- GAME LOGIC ---
+        function initGameState() {
+            const newGameState = {
+                countries: RAW_COUNTRY_DATA.map(c => ({
+                    name: c.name, // Only store name and economy, population comes from initialPopulation
+                    economy: c.economy,
+                    initialPopulation: c.population,
+                    currentPopulation: c.population, // Track current living population
+                    usersRelying: 0,
+                    deaths: 0,
+                    // countermeasures removed from country
+                    infected: false,
+                })),
+                traits: RAW_TRAIT_DATA.map(t => ({ id: t.id, acquired: false })), // Only id and acquired status
+                playerPoints: 0, // Will be set by config
+                gameTime: 0,
+                gameOver: false,
+                gameWon: false,
+                gameLost: false,
+                gameStarted: false,
+                selectedStartCountry: null,
+                config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)), // Deep copy
+                currentAGIStats: { usefulness: 0, threateningness: 0, lethality: 0 },
+                globalCountermeasures: 0,
+            };
+            newGameState.playerPoints = newGameState.config.initialPlayerPoints;
+            return newGameState;
+        }
+
+        function calculateAGIStats() {
+            let u = gameState.config.initialUsefulness;
+            let t = gameState.config.initialThreateningness;
+            let l = gameState.config.initialLethality;
+
+            gameState.traits.forEach(traitState => {
+                if (traitState.acquired) {
+                    const traitConfig = gameState.config.traitSettings[traitState.id];
+                    if (traitConfig) {
+                        u += traitConfig.usefulness;
+                        t += traitConfig.threateningness;
+                        l += traitConfig.lethality;
+                    }
+                }
+            });
+            gameState.currentAGIStats = { usefulness: u, threateningness: t, lethality: l };
+        }
+
+        function startGame(startCountryName) {
+            if (gameState.gameStarted) return;
+
+            gameState.gameStarted = true;
+            gameState.selectedStartCountry = startCountryName;
+            const country = gameState.countries.find(c => c.name === startCountryName);
+            if (country) {
+                country.infected = true;
+                country.usersRelying = Math.min(gameState.config.spreadCoefficients.initialUsersInStartCountry, country.currentPopulation);
+            }
+            calculateAGIStats();
+            document.getElementById('game-setup').style.display = 'none';
+            document.getElementById('game-content').style.display = 'block';
+            displayGlobalMessage("Game Started!", "info-message", 2000);
+            
+            clearInterval(gameLoopInterval); 
+            gameLoopInterval = setInterval(gameTick, gameState.config.gameSpeed);
+            
+            clearInterval(autoSaveInterval); 
+            autoSaveInterval = setInterval(saveGame, 5000);
+            updateUI();
+        }
+
+        function gameTick() {
+            if (gameState.gameOver) {
+                clearInterval(gameLoopInterval);
+                clearInterval(autoSaveInterval);
+                return;
+            }
+
+            gameState.gameTime++;
+            const { usefulness, threateningness, lethality } = gameState.currentAGIStats;
+
+            // 1. Update each country
+            let totalUsersRelyingThisTick = 0;
+            gameState.countries.forEach(country => {
+                if (country.currentPopulation <= 0) { // No living people, no activity
+                    country.usersRelying = 0;
+                    country.infected = false; // Consider it cleansed if population is 0
+                    return;
+                }
+                if (!country.infected) {
+                    totalUsersRelyingThisTick += country.usersRelying; // Add existing users if any (though should be 0 if not infected)
+                    return;
+                }
+
+
+                const prevUsersRelying = country.usersRelying;
+
+                // A. Spread AGI within country
+                const economyBonusFactor = 1.0 + gameState.config.globalEconomyBonus;
+                const effectiveUsefulness = usefulness * economyBonusFactor;
+                // Use global countermeasures
+                const spreadForce = effectiveUsefulness - gameState.globalCountermeasures; 
+                
+                let newUsersThisTick = 0;
+                if (spreadForce > 0) {
+                    const potentialNewUsers = spreadForce * gameState.config.spreadCoefficients.withinCountryUsefulnessFactor * (country.usersRelying || 1); // Use at least 1 to allow initial spread if usersRelying is 0 but infected
+                    const susceptiblePopulation = country.currentPopulation - country.usersRelying;
+                    newUsersThisTick = randomRound(Math.min(potentialNewUsers, Math.max(0, susceptiblePopulation)));
+                }
+                
+                country.usersRelying += newUsersThisTick;
+                country.usersRelying = Math.min(country.usersRelying, country.currentPopulation); 
+
+                if (country.usersRelying > prevUsersRelying) {
+                    gameState.playerPoints += gameState.config.pointRates.withinCountryInfectionBonus * Math.log(country.usersRelying + 1);
+                }
+                
+                // B. Develop Countermeasures (Moved to global calculation)
+
+                // C. Calculate Deaths
+                if (lethality > 0 && country.usersRelying > 0) {
+                    const deathsThisTick = randomRound(lethality * country.usersRelying * gameState.config.lethalityCoefficient);
+                    const actualDeaths = Math.min(deathsThisTick, country.currentPopulation); 
+                    country.deaths += actualDeaths;
+                    country.currentPopulation -= actualDeaths;
+                    country.usersRelying = Math.min(country.usersRelying, country.currentPopulation);
+                     if (country.usersRelying < 0) country.usersRelying = 0;
+                }
+                 if (country.currentPopulation <= 0) {
+                    country.usersRelying = 0; 
+                    country.currentPopulation = 0;
+                    country.infected = false; // No one left to be infected
+                }
+                totalUsersRelyingThisTick += country.usersRelying;
+            });
+
+            // 2. Develop Global Countermeasures (after country updates, based on total users)
+            if (totalUsersRelyingThisTick > 0) {
+                const counterMeasureIncrease = threateningness * Math.log(totalUsersRelyingThisTick + 1) * gameState.config.countermeasureCoefficient;
+                gameState.globalCountermeasures += counterMeasureIncrease;
+                gameState.globalCountermeasures = Math.max(0, gameState.globalCountermeasures);
+            }
+
+
+            // 3. Spread AGI between countries
+            const infectedCountries = gameState.countries.filter(c => c.infected && c.usersRelying > 0 && c.currentPopulation > 0);
+            const uninfectedCountries = gameState.countries.filter(c => !c.infected && c.currentPopulation > 0);
+
+            if (infectedCountries.length > 0 && uninfectedCountries.length > 0) {
+                infectedCountries.forEach(sourceCountry => {
+                    if (sourceCountry.currentPopulation <= 0 || sourceCountry.usersRelying <=0) return; // Skip if source is dead or no users
+
+                    uninfectedCountries.forEach(targetCountry => {
+                        if (targetCountry.infected || targetCountry.currentPopulation <=0) return;
+
+                        const economyBonusFactor = 1.0 + gameState.config.globalEconomyBonus;
+                        const effectiveUsefulnessForSpread = usefulness * economyBonusFactor;
+                        // Use global countermeasures for spread calculation
+                        const betweenCountryUsefulnessFactor = gameState.config.spreadCoefficients.withinCountryUsefulnessFactor * gameState.config.spreadCoefficients.betweenCountrySpreadRatio;
+                        const spreadChance = (effectiveUsefulnessForSpread - gameState.globalCountermeasures) * betweenCountryUsefulnessFactor;
+                        
+                        const sourceFactor = Math.log(sourceCountry.usersRelying + 1) / Math.log(sourceCountry.initialPopulation +1); 
+                        const finalSpreadChance = Math.max(0, spreadChance * sourceFactor) / (uninfectedCountries.length || 1); 
+
+                        if (Math.random() < finalSpreadChance) {
+                            targetCountry.infected = true;
+                            targetCountry.usersRelying = Math.min(gameState.config.spreadCoefficients.initialUsersInStartCountry, targetCountry.currentPopulation);
+                            gameState.playerPoints += gameState.config.pointRates.newCountryBonus * Math.log(targetCountry.initialPopulation + 1);
+                            displayGlobalMessage(`${targetCountry.name} has become reliant on AGI!`, "info-message", 1500);
+                        }
+                    });
+                });
+            }
+            
+            // 4. Check Win/Loss Conditions
+            let totalLivingPopulation = 0;
+            let currentTotalUsers = 0; // Recalculate based on updated country states
+            gameState.countries.forEach(c => {
+                totalLivingPopulation += c.currentPopulation;
+                currentTotalUsers += c.usersRelying;
+            });
+
+            if (totalLivingPopulation <= 0 && gameState.gameStarted) {
+                gameState.gameOver = true;
+                gameState.gameWon = true;
+                displayGlobalMessage("AGI has consumed humanity. You Win!", "win-message", 0); // Persistent message
+            } else if (currentTotalUsers <= 0 && gameState.gameStarted && gameState.countries.some(c => c.initialPopulation > 0)) { // Check if any country ever had population
+                // If AGI had a presence (e.g. selectedStartCountry is not null) and now has no users.
+                if (gameState.selectedStartCountry) { 
+                    gameState.gameOver = true;
+                    gameState.gameLost = true;
+                    displayGlobalMessage("AGI has been eradicated. Humanity Wins. You Lose!", "loss-message", 0); // Persistent message
+                }
+            }
+            
+            updateUI();
+        }
+        
+        function buyTrait(traitId) {
+            if (gameState.gameOver) return;
+            const traitState = gameState.traits.find(t => t.id === traitId);
+            const traitConfig = gameState.config.traitSettings[traitId];
+
+            if (!traitState || !traitConfig || traitState.acquired) return;
+
+            const actualCost = traitConfig.cost * gameState.config.traitCostMultiplier;
+            if (gameState.playerPoints < actualCost) {
+                displayGlobalMessage("Not enough points!", "error-message");
+                return;
+            }
+
+            // Check requirements (requirements are from RAW_TRAIT_DATA, as they are structural)
+            const rawTraitDef = RAW_TRAIT_DATA.find(r => r.id === traitId);
+            if (rawTraitDef) {
+                for (const reqId of rawTraitDef.requires) {
+                    const requiredTraitState = gameState.traits.find(r => r.id === reqId);
+                    const requiredTraitConfig = gameState.config.traitSettings[reqId];
+                    if (!requiredTraitState || !requiredTraitState.acquired) {
+                        displayGlobalMessage(`Requires: ${requiredTraitConfig ? requiredTraitConfig.name : reqId}`, "error-message");
+                        return;
+                    }
+                }
+            }
+
+
+            gameState.playerPoints -= actualCost;
+            traitState.acquired = true;
+            calculateAGIStats();
+            updateUI();
+            displayGlobalMessage(`${traitConfig.name} acquired!`, "info-message", 1500);
+        }
+
+        // --- UI UPDATES ---
+        function updateUI() {
+            // Game Stats
+            document.getElementById('game-time').textContent = gameState.gameTime;
+            document.getElementById('player-points').textContent = formatNumber(gameState.playerPoints);
+            
+            let totalUsers = 0;
+            let totalPopulation = 0;
+            let totalDeaths = 0;
+            gameState.countries.forEach(c => {
+                totalUsers += c.usersRelying;
+                totalPopulation += c.currentPopulation; 
+                totalDeaths += c.deaths;
+            });
+            document.getElementById('total-users').textContent = formatNumber(totalUsers);
+            document.getElementById('total-population').textContent = formatNumber(totalPopulation);
+            document.getElementById('total-deaths').textContent = formatNumber(totalDeaths);
+            document.getElementById('global-countermeasures').textContent = formatNumber(gameState.globalCountermeasures);
+            document.getElementById('current-usefulness').textContent = formatNumber(gameState.currentAGIStats.usefulness);
+            document.getElementById('current-threateningness').textContent = formatNumber(gameState.currentAGIStats.threateningness);
+            document.getElementById('current-lethality').textContent = formatNumber(gameState.currentAGIStats.lethality);
+
+
+            // Countries Table
+            const tbody = document.getElementById('countries-table').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = ''; 
+            gameState.countries.forEach(country => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = country.name;
+                row.insertCell().textContent = formatNumber(country.currentPopulation); 
+                row.insertCell().textContent = formatNumber(country.usersRelying);
+                row.insertCell().textContent = formatNumber(country.deaths);
+                // Countermeasures column removed
+                const statusCell = row.insertCell();
+                statusCell.textContent = country.infected ? (country.currentPopulation <=0 ? "Wiped Out" : "Infected") : (country.currentPopulation <=0 ? "Lifeless" : "Healthy");
+                if (country.infected && country.currentPopulation > 0) statusCell.style.color = 'red';
+                if (country.currentPopulation <=0) statusCell.style.color = 'grey';
+                row.insertCell().textContent = country.economy; // Still display for flavor
+            });
+
+            // Traits List
+            const traitsListDiv = document.getElementById('traits-list');
+            traitsListDiv.innerHTML = '';
+            gameState.traits.forEach(traitState => {
+                const traitConfig = gameState.config.traitSettings[traitState.id];
+                if (!traitConfig) return; // Should not happen if initialized correctly
+
+                const traitDiv = document.createElement('div');
+                traitDiv.className = 'trait-item';
+                if (traitState.acquired) traitDiv.classList.add('acquired');
+                
+                const actualCost = traitConfig.cost * gameState.config.traitCostMultiplier;
+                
+                // Requirements are from RAW_TRAIT_DATA as they are structural.
+                const rawTraitDef = RAW_TRAIT_DATA.find(r => r.id === traitState.id);
+                const reqs = rawTraitDef ? rawTraitDef.requires : [];
+
+
+                let tooltipText = `<strong>${traitConfig.name}</strong><br>
+                                   Usefulness: ${traitConfig.usefulness}, Threat: ${traitConfig.threateningness}, Lethality: ${traitConfig.lethality}<br>
+                                   Cost: ${formatNumber(actualCost)}<br>
+                                   <em>${traitConfig.description}</em>`;
+                if (reqs.length > 0) {
+                    tooltipText += `<br>Requires: ${reqs.map(rId => gameState.config.traitSettings[rId]?.name || rId).join(', ')}`;
+                }
+
+
+                traitDiv.innerHTML = `
+                    <span>${traitConfig.name} (${formatNumber(actualCost)} pts)</span>
+                `;
+                
+                const buyButton = document.createElement('button');
+                buyButton.textContent = 'Acquire';
+                buyButton.disabled = traitState.acquired || gameState.playerPoints < actualCost || gameState.gameOver;
+                
+                let reqsMet = true;
+                for (const reqId of reqs) {
+                    const requiredTraitState = gameState.traits.find(r => r.id === reqId);
+                    if (!requiredTraitState || !requiredTraitState.acquired) {
+                        reqsMet = false;
+                        break;
+                    }
+                }
+                if (!reqsMet) buyButton.disabled = true;
+
+                buyButton.onclick = () => buyTrait(traitState.id);
+                traitDiv.appendChild(buyButton);
+                
+                traitDiv.onmousemove = (e) => showTooltip(e, tooltipText);
+                traitDiv.onmouseleave = hideTooltip;
+
+                traitsListDiv.appendChild(traitDiv);
+            });
+        }
+        
+
+        // --- ADMIN & SETUP ---
+        function populateAdminControls() {
+            // Initial game state
+            document.getElementById('param-initialPlayerPoints').value = gameState.config.initialPlayerPoints;
+            document.getElementById('param-initialUsefulness').value = gameState.config.initialUsefulness;
+            document.getElementById('param-initialThreateningness').value = gameState.config.initialThreateningness;
+            document.getElementById('param-initialLethality').value = gameState.config.initialLethality;
+
+            // Point rates
+            document.getElementById('param-withinCountryInfectionBonus').value = gameState.config.pointRates.withinCountryInfectionBonus;
+            document.getElementById('param-newCountryBonus').value = gameState.config.pointRates.newCountryBonus;
+            // Spread coefficients
+            document.getElementById('param-withinCountryUsefulnessFactor').value = gameState.config.spreadCoefficients.withinCountryUsefulnessFactor;
+            document.getElementById('param-betweenCountrySpreadRatio').value = gameState.config.spreadCoefficients.betweenCountrySpreadRatio;
+            document.getElementById('param-initialUsersInStartCountry').value = gameState.config.spreadCoefficients.initialUsersInStartCountry;
+            // Combat coefficients
+            document.getElementById('param-lethalityCoefficient').value = gameState.config.lethalityCoefficient;
+            document.getElementById('param-countermeasureCoefficient').value = gameState.config.countermeasureCoefficient;
+            // Economy
+            document.getElementById('param-globalEconomyBonus').value = gameState.config.globalEconomyBonus;
+            // Trait costs
+            document.getElementById('param-traitCostMultiplier').value = gameState.config.traitCostMultiplier;
+
+            // Trait specific settings
+            const traitEditorDiv = document.getElementById('admin-trait-editor');
+            traitEditorDiv.innerHTML = ''; // Clear previous
+            RAW_TRAIT_DATA.forEach(rawTrait => { // Iterate in defined order
+                const traitConfig = gameState.config.traitSettings[rawTrait.id];
+                if (!traitConfig) return;
+
+                const entryDiv = document.createElement('div');
+                entryDiv.className = 'trait-admin-entry';
+                entryDiv.innerHTML = `<strong>${traitConfig.name} (ID: ${rawTrait.id})</strong><br>
+                    <label>U:</label><input type="number" step="1" id="trait-${rawTrait.id}-usefulness" value="${traitConfig.usefulness}">
+                    <label>T:</label><input type="number" step="1" id="trait-${rawTrait.id}-threateningness" value="${traitConfig.threateningness}">
+                    <label>L:</label><input type="number" step="1" id="trait-${rawTrait.id}-lethality" value="${traitConfig.lethality}">
+                    <label>Cost:</label><input type="number" step="1" id="trait-${rawTrait.id}-cost" value="${traitConfig.cost}">
+                `;
+                traitEditorDiv.appendChild(entryDiv);
+            });
+        }
+
+        function applyAdminSettings() {
+            // Initial game state
+            gameState.config.initialPlayerPoints = parseInt(document.getElementById('param-initialPlayerPoints').value);
+            gameState.config.initialUsefulness = parseInt(document.getElementById('param-initialUsefulness').value);
+            gameState.config.initialThreateningness = parseInt(document.getElementById('param-initialThreateningness').value);
+            gameState.config.initialLethality = parseInt(document.getElementById('param-initialLethality').value);
+            // Point rates
+            gameState.config.pointRates.withinCountryInfectionBonus = parseFloat(document.getElementById('param-withinCountryInfectionBonus').value);
+            gameState.config.pointRates.newCountryBonus = parseFloat(document.getElementById('param-newCountryBonus').value);
+            // Spread coefficients
+            gameState.config.spreadCoefficients.withinCountryUsefulnessFactor = parseFloat(document.getElementById('param-withinCountryUsefulnessFactor').value);
+            gameState.config.spreadCoefficients.betweenCountrySpreadRatio = parseFloat(document.getElementById('param-betweenCountrySpreadRatio').value);
+            gameState.config.spreadCoefficients.initialUsersInStartCountry = parseInt(document.getElementById('param-initialUsersInStartCountry').value);
+            // Combat coefficients
+            gameState.config.lethalityCoefficient = parseFloat(document.getElementById('param-lethalityCoefficient').value);
+            gameState.config.countermeasureCoefficient = parseFloat(document.getElementById('param-countermeasureCoefficient').value);
+            // Economy
+            gameState.config.globalEconomyBonus = parseFloat(document.getElementById('param-globalEconomyBonus').value);
+            // Trait costs
+            gameState.config.traitCostMultiplier = parseFloat(document.getElementById('param-traitCostMultiplier').value);
+
+            // Trait specific settings
+            RAW_TRAIT_DATA.forEach(rawTrait => {
+                const traitConfig = gameState.config.traitSettings[rawTrait.id];
+                if (traitConfig) {
+                    traitConfig.usefulness = parseInt(document.getElementById(`trait-${rawTrait.id}-usefulness`).value);
+                    traitConfig.threateningness = parseInt(document.getElementById(`trait-${rawTrait.id}-threateningness`).value);
+                    traitConfig.lethality = parseInt(document.getElementById(`trait-${rawTrait.id}-lethality`).value);
+                    traitConfig.cost = parseInt(document.getElementById(`trait-${rawTrait.id}-cost`).value);
+                }
+            });
+            
+            calculateAGIStats(); 
+            updateUI(); 
+            displayGlobalMessage("Admin parameters applied!", "info-message");
+        }
+
+        function resetParamsToDefault() {
+            // Preserve trait names, descriptions, requires from current RAW_TRAIT_DATA when resetting config.traitSettings
+            const freshTraitSettings = {};
+            RAW_TRAIT_DATA.forEach(trait => {
+                freshTraitSettings[trait.id] = {
+                    usefulness: trait.usefulness,
+                    threateningness: trait.threateningness,
+                    lethality: trait.lethality,
+                    cost: trait.cost,
+                    name: trait.name,
+                    requires: trait.requires,
+                    description: trait.description
+                };
+            });
+
+            gameState.config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)); // Get all other defaults
+            gameState.config.traitSettings = freshTraitSettings; // Override with freshly mapped trait settings
+
+            populateAdminControls(); // This will now use the reset gameState.config
+            calculateAGIStats();
+            updateUI();
+            displayGlobalMessage("Parameters reset to default!", "info-message");
+        }
+        
+        function handleResetGameRequest() {
+            document.getElementById('reset-game-btn').style.display = 'none';
+            document.getElementById('confirm-reset-game-btn').style.display = 'inline-block';
+            displayGlobalMessage("Are you sure you want to fully reset? Click 'Confirm Full Reset'.", "error-message", 0);
+        }
+
+        function confirmResetGame() {
+            document.getElementById('reset-game-btn').style.display = 'inline-block';
+            document.getElementById('confirm-reset-game-btn').style.display = 'none';
+            displayGlobalMessage("Game Resetting...", "info-message", 1000);
+
+            clearInterval(gameLoopInterval);
+            clearInterval(autoSaveInterval);
+            localStorage.removeItem('agiIncGameState');
+            gameState = initGameState(); // This re-initializes with default config, including player points
+            populateStartCountryDropdown();
+            populateAdminControls(); // This will populate based on the newly initialized gameState.config
+            document.getElementById('game-setup').style.display = 'block';
+            document.getElementById('game-content').style.display = 'none';
+            
+            // Ensure player points are correctly set from the potentially modified initialPlayerPoints in config
+            gameState.playerPoints = gameState.config.initialPlayerPoints; 
+            calculateAGIStats(); // Recalculate based on initial stats
+            updateUI(); 
+            displayGlobalMessage("Game has been fully reset.", "info-message");
+        }
+
+
+        function populateStartCountryDropdown() {
+            const select = document.getElementById('start-country');
+            select.innerHTML = '';
+            RAW_COUNTRY_DATA.forEach(country => {
+                const option = document.createElement('option');
+                option.value = country.name;
+                option.textContent = `${country.name} (Population: ${formatNumber(country.population)}, Economy: ${country.economy})`;
+                select.appendChild(option);
+            });
+        }
+
+        // --- LOCALSTORAGE ---
+        function saveGame() {
+            if (gameState && gameState.gameStarted) { 
+                try {
+                    localStorage.setItem('agiIncGameState', JSON.stringify(gameState));
+                    // console.log("Game saved automatically."); // Optional: too noisy for interval saves
+                } catch (e) {
+                    console.error("Error saving game to localStorage:", e);
+                    displayGlobalMessage("Error saving game. Storage might be full.", "error-message");
+                }
+            }
+        }
+
+        function loadGame() {
+            const savedState = localStorage.getItem('agiIncGameState');
+            if (savedState) {
+                try {
+                    let loadedGameState = JSON.parse(savedState);
+                    
+                    // Create a new default state to merge with
+                    const freshDefaultState = initGameState();
+                    
+                    // Merge config deeply, ensuring all new config keys are present
+                    loadedGameState.config = { ...freshDefaultState.config, ...loadedGameState.config };
+                    loadedGameState.config.pointRates = { ...freshDefaultState.config.pointRates, ...loadedGameState.config.pointRates };
+                    loadedGameState.config.spreadCoefficients = { ...freshDefaultState.config.spreadCoefficients, ...loadedGameState.config.spreadCoefficients };
+                    
+                    // Critical: Ensure traitSettings is properly merged or re-initialized if missing/malformed
+                    const defaultTraitSettings = JSON.parse(JSON.stringify(DEFAULT_CONFIG.traitSettings));
+                    if (!loadedGameState.config.traitSettings || typeof loadedGameState.config.traitSettings !== 'object') {
+                        loadedGameState.config.traitSettings = defaultTraitSettings;
+                    } else {
+                        // Ensure all traits from RAW_TRAIT_DATA exist in loaded config, add if missing, update static fields
+                        RAW_TRAIT_DATA.forEach(rawTrait => {
+                            if (!loadedGameState.config.traitSettings[rawTrait.id]) {
+                                loadedGameState.config.traitSettings[rawTrait.id] = defaultTraitSettings[rawTrait.id];
+                            } else {
+                                // Ensure name, requires, description are up-to-date from RAW data, as these are not meant to be saved as editable values
+                                loadedGameState.config.traitSettings[rawTrait.id].name = rawTrait.name;
+                                loadedGameState.config.traitSettings[rawTrait.id].requires = rawTrait.requires;
+                                loadedGameState.config.traitSettings[rawTrait.id].description = rawTrait.description;
+                            }
+                        });
+                    }
+                    
+                    // Ensure new top-level gameState properties are present
+                    gameState = { ...freshDefaultState, ...loadedGameState };
+                    // Re-assign player points from loaded config, as initGameState might reset it before config is fully merged.
+                    gameState.playerPoints = gameState.config.initialPlayerPoints;
+
+
+                    // Ensure countries have all necessary fields (like initialPopulation, currentPopulation)
+                    gameState.countries.forEach(c => {
+                        const rawC = RAW_COUNTRY_DATA.find(rc => rc.name === c.name);
+                        if (rawC) {
+                            c.initialPopulation = rawC.population;
+                            if (c.currentPopulation === undefined) { // If loading old save
+                                c.currentPopulation = rawC.population - (c.deaths || 0);
+                            }
+                        }
+                    });
+                    // Ensure traits only store id and acquired status in gameState.traits
+                     gameState.traits = gameState.traits.map(t => ({id: t.id, acquired: !!t.acquired}));
+
+
+                    console.log("Game loaded.");
+                    if (gameState.gameStarted) {
+                        document.getElementById('game-setup').style.display = 'none';
+                        document.getElementById('game-content').style.display = 'block';
+                        if (!gameState.gameOver) {
+                            clearInterval(gameLoopInterval); 
+                            gameLoopInterval = setInterval(gameTick, gameState.config.gameSpeed);
+                            clearInterval(autoSaveInterval);
+                            autoSaveInterval = setInterval(saveGame, 5000);
+                        } else {
+                            if(gameState.gameWon) displayGlobalMessage("AGI has consumed humanity. You Win!", "win-message", 0);
+                            else if(gameState.gameLost) displayGlobalMessage("AGI has been eradicated. Humanity Wins. You Lose!", "loss-message", 0);
+                        }
+                    }
+                    return true;
+                } catch (e) {
+                    console.error("Error loading game from localStorage:", e);
+                    localStorage.removeItem('agiIncGameState'); 
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            if (!loadGame()) {
+                gameState = initGameState();
+            }
+            // Ensure playerPoints is correct after load or init, based on config
+            gameState.playerPoints = gameState.config.initialPlayerPoints;
+
+            populateStartCountryDropdown();
+            populateAdminControls(); 
+            calculateAGIStats(); 
+            updateUI(); 
+
+            document.getElementById('start-game-btn').onclick = () => {
+                const selectedCountry = document.getElementById('start-country').value;
+                startGame(selectedCountry);
+            };
+            document.getElementById('reset-game-btn').onclick = handleResetGameRequest;
+            document.getElementById('confirm-reset-game-btn').onclick = confirmResetGame;
+            document.getElementById('apply-admin-settings-btn').onclick = applyAdminSettings;
+            document.getElementById('reset-params-btn').onclick = resetParamsToDefault;
+        };
+
+    </script>
+</body>
+</html>

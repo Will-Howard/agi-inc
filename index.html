@@ -126,6 +126,8 @@
                 <button id="apply-admin-settings-btn">Apply Parameter Changes</button>
                 <button id="reset-params-btn" class="secondary">Reset Parameters to Default</button>
             </details>
+            <!-- Always-visible Reset Game button at the bottom -->
+            <button id="always-visible-reset-game-btn" class="danger" style="margin-top:20px; width:100%;">Reset Game (Full Reset)</button>
         </div>
     </div>
 
@@ -832,6 +834,8 @@
             document.getElementById('confirm-reset-game-btn').onclick = confirmResetGame;
             document.getElementById('apply-admin-settings-btn').onclick = applyAdminSettings;
             document.getElementById('reset-params-btn').onclick = resetParamsToDefault;
+            // NEW: Always-visible reset game button
+            document.getElementById('always-visible-reset-game-btn').onclick = confirmResetGame;
         };
 
     </script>
